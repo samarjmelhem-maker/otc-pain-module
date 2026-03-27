@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>OTC Pain Management — Interactive Self-Learning | Dr. Samar J Melhem</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:Calibri,-apple-system,sans-serif;background:#F8FAFC}
+  button{font-family:inherit}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.6}}
+  .downloading{animation:pulse 1s infinite}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- =====================================================
+     GLOBAL DATA & DOCX GENERATOR
+     (Plain JS — accessible by both React & generateDocx)
+====================================================== -->
+<script>
+// ── Colour palette (mirrors React consts) ──
+var NY="#0D2D6B", TL="#0A7E8C", AM="#F59E0B", GN="#16A34A", RD="#DC2626";
+
+// ── Flashcard data ──
+var flashData=[
+  {id:1,cat:"Pain Pathway",q:"What are the 4 steps of the pain pathway?",
+   a:"1. DETECTION: Tissue injury → prostaglandins & bradykinins released → nociceptor activation\n2. TRANSMISSION: Aδ fibres (sharp, fast) + C fibres (dull, slow) carry signals to spinal cord\n3. MODULATION: Dorsal horn of spinal cord amplifies/dampens signals\n4. PERCEPTION: Brain (thalamus, cortex, limbic system) creates conscious pain experience",
+   tip:"Nociceptor = pain-sensing nerve ending. Aδ (A-delta) fibres = fast, myelinated (sharp pain). C fibres = slow, unmyelinated (dull ache). Dorsal horn = posterior part of spinal cord. NSAIDs act at Step 1 by blocking prostaglandin synthesis. Paracetamol acts centrally at Steps 3-4."},
+  {id:2,cat:"Pain Pathway",q:"Where do NSAIDs and paracetamol act differently in the pain pathway?",
+   a:"NSAIDs: Act PERIPHERALLY at Step 1 (Detection) — block COX enzymes → reduce prostaglandin synthesis at the site of tissue injury → analgesic + anti-inflammatory effect.\n\nParacetamol: Acts CENTRALLY at Steps 3-4 (Modulation/Perception) — inhibits central prostaglandin synthesis in the brain → analgesic + antipyretic but NO anti-inflammatory effect.",
+   tip:"COX = Cyclooxygenase (the enzyme that converts arachidonic acid to prostaglandins). This difference explains why NSAIDs are better for inflammatory pain (arthritis, sprains) while paracetamol is adequate for non-inflammatory pain (headache, fever)."},
+  {id:3,cat:"Pain Pathway",q:"Name the 3 types of pain and which responds to OTC analgesics.",
+   a:"1. SOMATIC pain: From skin, muscles, bones, joints. Well-localised. RESPONDS to OTC (NSAIDs, paracetamol)\n2. VISCERAL pain: From internal organs. Poorly localised, deep. Usually NOT OTC-treatable → refer\n3. NEUROPATHIC pain: From nerve damage. Burning, electric-shock. NOT OTC-treatable → requires prescription (gabapentin, pregabalin)",
+   tip:"Somatic = from Greek 'soma' (body). Visceral = relating to internal organs. Neuropathic = from nerve (neuro) + disease (pathos). OTC analgesics primarily address SOMATIC pain. Matching drug to pain type is a key clinical skill."},
+  {id:4,cat:"Headaches",q:"How do you differentiate TTH from migraine using 3 key features?",
+   a:"TTH (Tension-Type Headache):\n• BILATERAL, pressing, band-like\n• NO nausea, NO photophobia\n• Gradual onset, worsens through day\n\nMigraine:\n• UNILATERAL, throbbing\n• YES nausea, YES photophobia/phonophobia\n• May have aura (visual disturbances in 25%)",
+   tip:"TTH = Tension-Type Headache (most common primary headache). Photophobia = sensitivity to light. Phonophobia = sensitivity to sound. Aura = neurological symptoms 30-60 min before migraine (flashing lights, blind spots, tingling). The 3-Question Screening Tool: Disability + Nausea + Photophobia — 2 of 3 'Yes' = 93% probability of migraine."},
+  {id:5,cat:"Headaches",q:"Why is the statement '90% of sinus headaches are actually migraine' clinically important?",
+   a:"Most patients self-diagnosing 'sinus headache' actually have MIGRAINE. The confusion occurs because migraine can cause nasal congestion and facial pressure (autonomic symptoms).\n\nTrue sinus headache REQUIRES: thick DISCOLOURED nasal discharge + fever + reduced sense of smell.\n\nNasal congestion ALONE does not = sinus headache.\n\nImplication: These patients need migraine-specific treatment (AAC combo, triptans), not decongestants.",
+   tip:"AAC = Acetaminophen + Aspirin + Caffeine (the most effective OTC migraine combination). Caffeine enhances analgesic absorption by ~40%. Common brand: Excedrin Migraine. Triptans (e.g., sumatriptan) are prescription-only migraine-specific drugs."},
+  {id:6,cat:"Headaches",q:"When is cluster headache NOT treatable with OTC medications?",
+   a:"ALWAYS — cluster headache does NOT respond to OTC analgesics. Must REFER to physician.\n\nCharacteristics: Severe unilateral ORBITAL pain + same-side tearing (lacrimation) + conjunctivitis + nasal congestion + ptosis (drooping eyelid). Predominantly men aged 40-60. Attacks occur at SAME TIME daily, often nocturnal. Duration: 10 min–3 hours.\n\nTreatment: High-flow oxygen, subcutaneous sumatriptan (prescription only).",
+   tip:"Lacrimation = tearing/watering of the eye. Conjunctivitis = redness/inflammation of the eye. Ptosis = drooping of the upper eyelid. Cluster headaches are sometimes called 'suicide headaches' due to their extreme severity. Key pharmacy action: recognise and REFER — do not waste time with OTC products."},
+  {id:7,cat:"Medications",q:"Compare the COX selectivity and key advantage of ibuprofen vs naproxen vs aspirin.",
+   a:"Ibuprofen: Non-selective COX. OTC 200-400mg. Duration 4-6h. KEY: LOWEST GI risk among NSAIDs.\n\nNaproxen: Non-selective COX. OTC 220mg. Duration ≤12h. KEY: LOWEST CV risk + longest OTC duration.\n\nAspirin: Non-selective COX. OTC 325-1000mg. Duration 4-6h. KEY: IRREVERSIBLE COX inhibition → antiplatelet effect lasts 7-10 days. NEVER in children <16 (Reye's syndrome).",
+   tip:"COX = Cyclooxygenase. COX-1 = constitutive (stomach protection, platelet function, kidney blood flow). COX-2 = inducible (pain, inflammation, fever). Non-selective = blocks both COX-1 and COX-2. Selection guide: GI concerns → ibuprofen (lowest GI risk). CV concerns → naproxen (lowest CV risk). Need antiplatelet → aspirin (but only in adults). Reye's syndrome = acute liver failure + brain swelling in children given aspirin during viral illness."},
+  {id:8,cat:"Medications",q:"What is the maximum daily dose of paracetamol and why is overdose so dangerous?",
+   a:"Maximum: 4,000 mg/day (adults). High-risk patients (liver disease, ≥3 drinks/day, malnutrition): ≤2,000 mg/day.\n\nOverdose causes HEPATOTOXICITY (liver failure):\n• Hepatotoxic dose: ≥10-15g\n• Potentially fatal: ≥20-25g\n\nMechanism: Saturation of normal metabolic pathways → CYP450 produces toxic NAPQI metabolite → depletes glutathione → hepatocellular necrosis.\n\nAntidote: NAC (N-Acetylcysteine) — most effective within 8-10 hours.",
+   tip:"CYP450 = Cytochrome P450 (liver enzyme system). NAPQI = N-acetyl-p-benzoquinone imine (the toxic metabolite). Glutathione = the body's natural antioxidant that neutralises NAPQI. NAC = N-Acetylcysteine (replenishes glutathione stores). The BIGGEST risk: HIDDEN paracetamol in combination OTC products (cold/flu remedies, sleep aids) → patients unknowingly exceed max dose."},
+  {id:9,cat:"NSAID Safety",q:"What is the 'Triple Whammy' and why is it so dangerous?",
+   a:"NSAID + ACE inhibitor/ARB + Diuretic taken together → ACUTE KIDNEY INJURY (AKI).\n\nMechanism:\n• NSAIDs: Block renal prostaglandins → reduced afferent arteriole dilation\n• ACE-I/ARBs: Block angiotensin II → reduced efferent arteriole constriction\n• Diuretics: Reduce blood volume\n\nCombined = catastrophic reduction in glomerular perfusion → kidney failure.\n\nAlways ask: 'Are you on blood pressure tablets or water tablets?' before recommending ANY NSAID.",
+   tip:"ACE-I = ACE Inhibitor (ramipril, lisinopril, enalapril). ARB = Angiotensin Receptor Blocker (losartan, valsartan). AKI = Acute Kidney Injury. Afferent arteriole = blood vessel bringing blood INTO the glomerulus. Efferent arteriole = blood vessel taking blood AWAY from the glomerulus. Glomerulus = filtering unit of the kidney."},
+  {id:10,cat:"NSAID Safety",q:"Explain the GI/CV risk decision matrix for NSAID selection.",
+   a:"LOW GI + LOW CV risk: Any NSAID at lowest dose, shortest duration.\nMODERATE GI + LOW CV: NSAID + PPI (proton pump inhibitor).\nHIGH GI + LOW CV: COX-2 inhibitor + PPI, or avoid NSAIDs entirely.\nLOW GI + HIGH CV: Naproxen + PPI (naproxen has lowest CV risk).\nHIGH GI + HIGH CV: AVOID ALL NSAIDs — use alternative analgesia (paracetamol).\n\nGI risk factors: age >65, previous ulcer, concurrent aspirin/steroids/anticoagulants.",
+   tip:"PPI = Proton Pump Inhibitor (omeprazole, pantoprazole, lansoprazole) — reduces stomach acid production → protects against NSAID-induced ulcers. COX-2 selective (celecoxib) = better GI safety but still has CV risk. CV risk hierarchy: Diclofenac (HIGHEST, HR 3.26) > COX-2 inhibitors > other NSAIDs > Naproxen (LOWEST). HR = Hazard Ratio."},
+  {id:11,cat:"Special Pops",q:"Why must you ALWAYS screen medication lists before recommending NSAIDs?",
+   a:"Five HIGH-RISK interactions:\n1. Warfarin + NSAID → major GI bleeding (NSAIDs inhibit platelets + displace warfarin)\n2. Lithium + NSAID → lithium toxicity (NSAIDs reduce renal clearance)\n3. ACE-I/ARB + Diuretic + NSAID → Triple Whammy (AKI)\n4. Methotrexate + NSAID → methotrexate toxicity (reduced renal clearance)\n5. Corticosteroid + NSAID → additive GI ulceration risk\n\nIn ALL cases: paracetamol is the SAFER alternative.",
+   tip:"INR = International Normalised Ratio (measures warfarin's effect). Lithium = mood stabiliser with NARROW therapeutic index (small changes in blood level cause toxicity: tremor, confusion, seizures). MTX = Methotrexate (immunosuppressant for RA, psoriasis; toxic effects: bone marrow suppression, liver damage)."},
+  {id:12,cat:"Special Pops",q:"What is Medication Overuse Headache (MOH) and how is it managed?",
+   a:"MOH = chronic daily headache CAUSED by overusing analgesics.\n\nCriteria: Analgesic use ≥15 days/month for ≥3 months.\n\nMechanism: Chronic analgesic use causes central sensitisation → lower pain threshold → more headaches → more analgesic use → vicious cycle.\n\nManagement: SUPERVISED WITHDRAWAL (not stronger medication). Expect 2-6 weeks of temporary worsening before improvement. Preventive therapy may be needed.",
+   tip:"MOH = Medication Overuse Headache (previously called 'rebound headache' or 'analgesic-induced headache'). This is very COMMON but underrecognised. Any analgesic can cause it — paracetamol, NSAIDs, triptans, opioids. The pharmacist's role: recognise the pattern (frequent analgesic purchases, escalating use) and refer for supervised withdrawal. Simply giving stronger medication makes it WORSE."},
+];
+
+// ── Clinical scenario data ──
+var scenariosData=[
+  {id:1,title:"Headache Differential",
+   desc:"A 35-year-old woman reports recurrent headaches every month: unilateral throbbing pain behind her right eye, lasting 6-12 hours, with nausea and sensitivity to light. She's been buying 'sinus headache' tablets (paracetamol + phenylephrine) without relief.",
+   options:["Continue sinus medication with added decongestant","This is likely MIGRAINE (not sinus) — recommend AAC combination (Acetaminophen + Aspirin + Caffeine)","Recommend ibuprofen 200mg for sinus inflammation","Refer urgently for brain imaging"],
+   correct:1,
+   explanation:"Classic MIGRAINE presentation: unilateral, throbbing, nausea, photophobia, recurrent monthly (hormonal trigger). 90% of self-diagnosed 'sinus headaches' are actually migraine. Sinus headache requires thick DISCOLOURED discharge + fever — neither present here.\n\nAAC combo (e.g., Excedrin Migraine) is the most effective OTC migraine treatment. Caffeine enhances analgesic absorption by ~40%.\n\nAAC = Acetaminophen + Aspirin + Caffeine. Photophobia = light sensitivity."},
+  {id:2,title:"Elderly Polypharmacy",
+   desc:"A 72-year-old man on warfarin 5mg, ramipril 10mg, and furosemide 40mg presents with knee pain from osteoarthritis. He asks for 'the strongest painkiller you have' and reaches for naproxen 220mg.",
+   options:["Naproxen is fine — it has the lowest CV risk","STOP — naproxen is contraindicated. Triple Whammy (NSAID + ACE-I + diuretic) → AKI. Plus warfarin → GI bleeding. Recommend paracetamol + topical NSAID.","Give ibuprofen instead — lower GI risk than naproxen","Recommend aspirin — he's already on warfarin so the bleeding risk is already present"],
+   correct:1,
+   explanation:"FIVE contraindications to ANY oral NSAID here:\n1. Triple Whammy: NSAID + ramipril (ACE-I) + furosemide (diuretic) → Acute Kidney Injury\n2. Warfarin → NSAIDs increase GI bleeding risk (antiplatelet effect + gastric mucosal damage)\n3. Age >65 → highest risk for ALL NSAID adverse effects\n4. Heart failure (indicated by furosemide) → NSAIDs cause fluid retention\n\nSAFE: Paracetamol 1g q6h (max 4g/day) + topical NSAID gel (minimal systemic absorption).\n\nACE-I = ACE Inhibitor. AKI = Acute Kidney Injury."},
+  {id:3,title:"Pregnant Patient",
+   desc:"A 32-year-old woman, 28 weeks pregnant, has a severe tension headache. She asks if she can take ibuprofen 400mg as 'it works better than paracetamol for her.'",
+   options:["Ibuprofen is safe in pregnancy at this dose","CONTRAINDICATED — ibuprofen (all NSAIDs) are contraindicated after 20 weeks. Recommend paracetamol 1g (safe all trimesters).","Give aspirin instead — it's safer than ibuprofen in pregnancy","Recommend naproxen — longer duration means fewer doses"],
+   correct:1,
+   explanation:"ALL NSAIDs are CONTRAINDICATED after 20 weeks gestation.\n\nRisks: Oligohydramnios (low amniotic fluid from reduced fetal urine output), premature closure of ductus arteriosus (fetal cardiac vessel), fetal renal dysfunction.\n\nParacetamol is SAFE throughout ALL trimesters (confirmed by MHRA, NICE, RCOG, EMA, WHO 2025). Use lowest effective dose, shortest duration.\n\nOligohydramnios = abnormally low amniotic fluid. Ductus arteriosus = fetal blood vessel connecting pulmonary artery to aorta (normally closes after birth)."},
+  {id:4,title:"MOH Recognition",
+   desc:"A 45-year-old woman has been buying paracetamol + codeine combination tablets from your pharmacy every week for 4 months. She reports daily headaches that are 'getting worse.' She wants a stronger product.",
+   options:["Recommend ibuprofen — different mechanism may help","Recommend a triple combination product for more potency","Recognise likely MOH (Medication Overuse Headache) — analgesic use ≥15 days/month for ≥3 months. Refer to GP for supervised withdrawal.","Suggest increasing the codeine dose for better effect"],
+   correct:2,
+   explanation:"This is a TEXTBOOK case of MOH (Medication Overuse Headache).\n\nCriteria met: Daily headaches + analgesic use for 4 months (>3 months) + worsening despite treatment + escalating demand.\n\nMechanism: Chronic analgesic use causes central sensitisation → lower pain threshold → more headaches → more medication → vicious cycle.\n\nThe WRONG approach: giving STRONGER medication (makes MOH worse).\nThe RIGHT approach: Refer for supervised withdrawal. Expect 2-6 weeks temporary worsening before improvement.\n\nMOH = Medication Overuse Headache. Previously called 'rebound headache.'"},
+  {id:5,title:"Analgesic Selection",
+   desc:"A 25-year-old athlete presents with acute ankle sprain from football — significant swelling, pain on movement, no deformity. Asks for paracetamol.",
+   options:["Paracetamol is ideal — give 1g and advise RICE protocol","Recommend ibuprofen instead — anti-inflammatory effect is needed for this INFLAMMATORY injury. Plus RICE protocol.","Refer to A&E — all sports injuries need X-ray","Recommend aspirin for both pain and swelling"],
+   correct:1,
+   explanation:"This is INFLAMMATORY somatic pain — swelling indicates active inflammation requiring an ANTI-INFLAMMATORY drug.\n\nParacetamol has NO significant anti-inflammatory effect (works centrally). For acute sprains with swelling, an NSAID (ibuprofen) is superior because it blocks peripheral prostaglandin synthesis at the injury site.\n\nRecommend: Ibuprofen 400mg q6-8h with food + RICE protocol.\n\nRICE = Rest, Ice, Compression, Elevation (standard acute soft tissue injury management).\n\nKey principle: Match drug to pain type. Inflammatory pain → NSAID. Non-inflammatory pain → paracetamol is adequate."},
+  {id:6,title:"Red Flag Recognition",
+   desc:"A 58-year-old man describes 'the worst headache of my life' — sudden onset 2 hours ago, like being hit on the head. He's also feeling nauseous and his neck feels stiff. He asks for strong painkillers.",
+   options:["Give paracetamol 1g + ibuprofen 400mg for severe pain","Recommend AAC combination for maximum relief","Do NOT give any medication — this is a RED FLAG. Sudden 'thunderclap' headache + neck stiffness = possible subarachnoid haemorrhage. Call 999 immediately.","Advise rest in a dark room and return if it doesn't improve"],
+   correct:2,
+   explanation:"RED FLAG EMERGENCY: 'Thunderclap' headache (sudden-onset, worst-ever) + neck stiffness + nausea = POSSIBLE SUBARACHNOID HAEMORRHAGE until proven otherwise.\n\nThis is a NEUROSURGICAL EMERGENCY. Call 999 immediately. Do NOT give analgesics (may delay diagnosis). Do NOT send to GP. Do NOT advise 'wait and see.'\n\nSubarachnoid haemorrhage = bleeding between the brain and its covering membranes, usually from a ruptured cerebral aneurysm. Mortality is ~50% if untreated. Early diagnosis and treatment saves lives.\n\nKey pharmacy rule: 'Worst headache ever' + sudden onset = call 999."},
+];
+
+// ── Drug interaction data ──
+var drugData=[
+  {drug:"72-year-old on warfarin needs knee pain relief",
+   safe:"Paracetamol ≤2g/day (with INR monitoring) + topical NSAID gel",
+   avoid:"ALL oral NSAIDs — ↑ GI bleeding risk (antiplatelet effect + gastric mucosal damage) + potential warfarin displacement",
+   why:"NSAIDs have TWO bleeding mechanisms with warfarin: (1) Inhibit COX-1 in platelets → reduced platelet aggregation → direct antiplatelet effect. (2) Some NSAIDs displace warfarin from plasma protein binding → more free warfarin in blood. Topical NSAID gel is acceptable (minimal systemic absorption). INR = International Normalised Ratio."},
+  {drug:"Patient on ramipril + furosemide has muscle pain",
+   safe:"Paracetamol (standard dose up to 4g/day)",
+   avoid:"ANY oral NSAID — 'Triple Whammy': NSAID + ACE-I (ramipril) + Diuretic (furosemide) → Acute Kidney Injury",
+   why:"Triple Whammy mechanism: NSAIDs block renal prostaglandins (afferent arteriole dilation). ACE-I blocks angiotensin II (efferent arteriole constriction). Diuretic reduces blood volume. Combined = catastrophic glomerular perfusion failure → AKI. ACE-I = ACE Inhibitor. AKI = Acute Kidney Injury."},
+  {drug:"Patient on lithium 900mg daily has a headache",
+   safe:"Paracetamol (no interaction with lithium)",
+   avoid:"ALL NSAIDs — reduce renal lithium clearance → lithium toxicity (tremor, confusion, seizures, cardiac arrhythmia)",
+   why:"Lithium has a NARROW therapeutic index (therapeutic 0.6-1.2 mmol/L; toxic >1.5 mmol/L). NSAIDs reduce renal prostaglandins → reduced renal blood flow → reduced lithium excretion → accumulation → toxicity. Even short-term NSAID use can precipitate lithium toxicity."},
+  {drug:"30-week pregnant woman with back pain",
+   safe:"Paracetamol (safe ALL trimesters — confirmed MHRA, NICE, RCOG, EMA, WHO 2025)",
+   avoid:"ALL NSAIDs — CONTRAINDICATED after 20 weeks gestation",
+   why:"After 20 weeks: NSAIDs cause oligohydramnios (low amniotic fluid from fetal renal prostaglandin inhibition → reduced fetal urine output) + premature closure of ductus arteriosus (fetal cardiac vessel) + fetal renal dysfunction. These risks are well-documented and potentially serious."},
+  {drug:"55-year-old on methotrexate 15mg/week for rheumatoid arthritis has dental pain",
+   safe:"Paracetamol (does not affect methotrexate clearance)",
+   avoid:"NSAIDs — reduce renal methotrexate clearance → methotrexate toxicity (bone marrow suppression, hepatotoxicity, mucositis)",
+   why:"Methotrexate (MTX) = immunosuppressant/DMARD (Disease-Modifying Anti-Rheumatic Drug). Primarily excreted renally. NSAIDs reduce renal prostaglandins → decreased renal blood flow → decreased MTX excretion → accumulation → potentially fatal toxicity (pancytopenia, liver failure)."},
+  {drug:"12-year-old with fever and body aches during viral illness",
+   safe:"Paracetamol (first-line) OR ibuprofen (safe >6 months, take with food)",
+   avoid:"ASPIRIN — risk of Reye's syndrome in anyone <16 years old",
+   why:"Reye's syndrome = acute liver failure + encephalopathy (brain swelling). Rare but potentially FATAL. Associated specifically with aspirin use during VIRAL illness in children/adolescents. Mechanism: aspirin triggers mitochondrial dysfunction → fatty degeneration of liver + cerebral oedema. Encephalopathy = disease affecting brain function."},
+];
+
+// ── DOCX Generator ──────────────────────────────────────
+async function generateDocx() {
+  var btn = document.getElementById('docx-btn');
+  btn.disabled = true;
+  btn.className = 'downloading';
+  btn.textContent = '⏳ Generating...';
+
+  try {
+    var D = window.docx;
+    var Paragraph = D.Paragraph, TextRun = D.TextRun, Document = D.Document,
+        Packer = D.Packer, HeadingLevel = D.HeadingLevel,
+        AlignmentType = D.AlignmentType;
+
+    function hr() {
+      return new Paragraph({
+        children: [new TextRun({ text: "─".repeat(80), color: "CBD5E1", size: 16 })],
+        spacing: { before: 160, after: 160 }
+      });
+    }
+    function spacer(n) {
+      var arr = [];
+      for (var i = 0; i < (n||1); i++) arr.push(new Paragraph({ text: "" }));
+      return arr;
+    }
+    function h1(text) {
+      return new Paragraph({
+        children: [new TextRun({ text: text, bold: true, size: 40, color: "0D2D6B" })],
+        spacing: { before: 500, after: 200 },
+        border: { bottom: { color: "0A7E8C", size: 12, space: 1, style: "single" } }
+      });
+    }
+    function h2(text, color) {
+      return new Paragraph({
+        children: [new TextRun({ text: text, bold: true, size: 28, color: color || "0A7E8C" })],
+        spacing: { before: 280, after: 100 }
+      });
+    }
+    function label(txt, color) {
+      return new TextRun({ text: txt, bold: true, color: color, size: 22 });
+    }
+    function body(txt, opts) {
+      opts = opts || {};
+      return new TextRun({ text: txt, size: 22, color: opts.color || "1E293B",
+        italics: opts.italics, bold: opts.bold });
+    }
+    function multiline(text, indented, color) {
+      var lines = text.split('\n');
+      return lines.filter(function(l){ return l.trim(); }).map(function(l) {
+        return new Paragraph({
+          children: [new TextRun({ text: l, size: 22, color: color || "1E293B" })],
+          spacing: { after: 60 },
+          indent: indented ? { left: 360 } : undefined
+        });
+      });
+    }
+
+    var children = [];
+
+    // ─── TITLE PAGE ───────────────────────────────────────
+    children.push(spacer(2)[0]);
+    children.push(new Paragraph({
+      children: [new TextRun({ text: "OTC Pain Management", bold: true, size: 64, color: "0D2D6B" })],
+      alignment: AlignmentType.CENTER
+    }));
+    children.push(new Paragraph({
+      children: [new TextRun({ text: "Interactive Self-Learning Study Guide", size: 36, color: "0A7E8C" })],
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 120 }
+    }));
+    children.push(new Paragraph({
+      children: [new TextRun({ text: "Part 2 — Flashcards, Clinical Cases & Drug Interaction Challenges", size: 24, color: "64748B" })],
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 240 }
+    }));
+    children.push(hr());
+    children.push(new Paragraph({
+      children: [new TextRun({ text: "Dr. Samar J Melhem", bold: true, size: 28, color: "0D2D6B" })],
+      alignment: AlignmentType.CENTER
+    }));
+    children.push(new Paragraph({
+      children: [new TextRun({ text: "School of Pharmacy | University of Jordan", size: 24, color: "64748B" })],
+      alignment: AlignmentType.CENTER
+    }));
+    children.push(spacer(1)[0]);
+    children.push(new Paragraph({
+      children: [new TextRun({ text: "Contents: 12 Flashcards  |  6 Clinical Scenarios  |  6 Drug Interaction Challenges", size: 22, color: "94A3B8", italics: true })],
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 400 }
+    }));
+
+    // ─── SECTION 1: FLASHCARDS ────────────────────────────
+    children.push(h1("SECTION 1 — FLASHCARDS  (12 cards)"));
+
+    flashData.forEach(function(card, i) {
+      children.push(h2("Card " + (i+1) + " of 12 \u2014 " + card.cat));
+      children.push(new Paragraph({
+        children: [label("Q:  ", "0D2D6B"), body(card.q)],
+        spacing: { after: 100 }
+      }));
+      children.push(new Paragraph({
+        children: [label("\u2713 Answer:", "16A34A")],
+        spacing: { after: 80 }
+      }));
+      multiline(card.a, true).forEach(function(p){ children.push(p); });
+      children.push(new Paragraph({
+        children: [label("\uD83D\uDCA1 Learning Tip:", "F59E0B")],
+        spacing: { before: 120, after: 80 }
+      }));
+      multiline(card.tip, true, "92400E").forEach(function(p){
+        p.children.forEach(function(r){ r.options.italics = true; });
+        children.push(p);
+      });
+      children.push(hr());
+    });
+
+    // ─── SECTION 2: CLINICAL SCENARIOS ────────────────────
+    children.push(h1("SECTION 2 — CLINICAL SCENARIOS  (6 cases)"));
+    children.push(new Paragraph({
+      children: [body("For each scenario, select the best pharmacist response. The correct answer and full explanation follow.", { italics: true, color: "64748B" })],
+      spacing: { after: 200 }
+    }));
+
+    scenariosData.forEach(function(sc, i) {
+      children.push(h2("Case " + (i+1) + " of 6:  " + sc.title, "0D2D6B"));
+      children.push(new Paragraph({
+        children: [body(sc.desc)],
+        spacing: { after: 120 }
+      }));
+      children.push(new Paragraph({
+        children: [label("Options:", "334155")],
+        spacing: { after: 80 }
+      }));
+      sc.options.forEach(function(opt, j) {
+        var isCorrect = j === sc.correct;
+        children.push(new Paragraph({
+          children: [
+            new TextRun({ text: String.fromCharCode(65+j) + ") " + opt,
+              bold: isCorrect, color: isCorrect ? "16A34A" : "334155", size: 22 }),
+            isCorrect ? new TextRun({ text: "  \u2713 CORRECT", bold: true, color: "16A34A", size: 22 }) : new TextRun("")
+          ],
+          spacing: { after: 60 },
+          indent: { left: 360 }
+        }));
+      });
+      children.push(new Paragraph({
+        children: [label("\uD83D\uDCDD Explanation:", "0D2D6B")],
+        spacing: { before: 140, after: 80 }
+      }));
+      multiline(sc.explanation, true).forEach(function(p){ children.push(p); });
+      children.push(hr());
+    });
+
+    // ─── SECTION 3: DRUG INTERACTIONS ─────────────────────
+    children.push(h1("SECTION 3 — DRUG INTERACTION CHALLENGES  (6 items)"));
+    children.push(new Paragraph({
+      children: [body("For each patient, identify the SAFE analgesic and what to AVOID, with pharmacological reasoning.", { italics: true, color: "64748B" })],
+      spacing: { after: 200 }
+    }));
+
+    drugData.forEach(function(item, i) {
+      children.push(h2("Challenge " + (i+1) + " of 6", "F59E0B"));
+      children.push(new Paragraph({
+        children: [label("\uD83D\uDC64 Patient:  ", "0D2D6B"), body(item.drug, { bold: true })],
+        spacing: { after: 100 }
+      }));
+      children.push(new Paragraph({
+        children: [label("\u2713 SAFE:  ", "16A34A"), body(item.safe)],
+        spacing: { after: 80 }
+      }));
+      children.push(new Paragraph({
+        children: [label("\u2717 AVOID:  ", "DC2626"), body(item.avoid)],
+        spacing: { after: 80 }
+      }));
+      children.push(new Paragraph({
+        children: [label("\uD83D\uDD0D Why?  ", "92400E"), body(item.why, { italics: true, color: "92400E" })],
+        spacing: { after: 80 }
+      }));
+      children.push(hr());
+    });
+
+    // ─── FOOTER NOTE ──────────────────────────────────────
+    children.push(new Paragraph({
+      children: [new TextRun({ text: "Dr. Samar J Melhem  |  School of Pharmacy, University of Jordan  |  OTC Pain Management Module", size: 20, color: "94A3B8", italics: true })],
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 300 }
+    }));
+
+    var doc = new Document({
+      creator: "Dr. Samar J Melhem",
+      title: "OTC Pain Management Study Guide",
+      description: "Interactive Self-Learning Module — Part 2",
+      sections: [{ properties: {}, children: children }]
+    });
+
+    var blob = await Packer.toBlob(doc);
+    saveAs(blob, "OTC_Pain_Management_Study_Guide.docx");
+
+  } catch(e) {
+    alert("Error generating DOCX: " + e.message);
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+    btn.className = '';
+    btn.textContent = '⬇ Download Study Guide (.docx)';
+  }
+}
+</script>
+
+<!-- =====================================================
+     REACT APPLICATION
+====================================================== -->
+<script type="text/babel">
+const {useState} = React;
+const NY="#0D2D6B", TL="#0A7E8C", RD="#DC2626", AM="#F59E0B", GN="#16A34A";
+
+// Use globally defined data arrays
+const flash   = window.flashData     || [];
+const scenarios = window.scenariosData || [];
+const drugItems = window.drugData      || [];
+
+/* ── Flashcard deck ──────────────────────────────────── */
+function FlashDeck({cards, title}) {
+  const [idx, setIdx] = useState(0);
+  const [flip, setFlip] = useState(false);
+  const [tip, setTip] = useState(false);
+  const c = cards[idx];
+  if (!c) return null;
+  return (
+    <div style={{marginBottom:24}}>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:12}}>
+        <h3 style={{margin:0,color:NY,fontSize:18}}>{title}</h3>
+        <span style={{color:TL,fontWeight:600,fontSize:14}}>{idx+1}/{cards.length}</span>
+      </div>
+      <div onClick={()=>setFlip(!flip)}
+        style={{cursor:'pointer',minHeight:180,background:flip?'#F0FDF4':'white',
+          border:`2px solid ${flip?GN:TL}`,borderRadius:12,padding:24,
+          boxShadow:'0 4px 12px rgba(0,0,0,0.08)',transition:'all 0.3s'}}>
+        <div style={{fontSize:11,color:flip?GN:TL,fontWeight:700,textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>
+          {flip ? '✓ Answer' : '? Question'} — {c.cat}
+        </div>
+        <div style={{fontSize:15,color:'#1E293B',lineHeight:1.6,whiteSpace:'pre-line'}}>
+          {flip ? c.a : c.q}
+        </div>
+        {!flip && <div style={{marginTop:16,fontSize:13,color:'#94A3B8',fontStyle:'italic'}}>👆 Tap to reveal answer</div>}
+      </div>
+      {flip && (
+        <div style={{marginTop:8}}>
+          <button onClick={e=>{e.stopPropagation();setTip(!tip)}}
+            style={{background:tip?NY:'#EBF0FA',color:tip?'white':NY,border:'none',
+              borderRadius:8,padding:'8px 16px',cursor:'pointer',fontSize:13,fontWeight:600}}>
+            {tip ? 'Hide' : 'Show'} Learning Tip &amp; Abbreviations
+          </button>
+          {tip && (
+            <div style={{marginTop:8,background:'#FEF3C7',borderLeft:`4px solid ${AM}`,
+              borderRadius:8,padding:16,fontSize:14,color:'#1E293B',lineHeight:1.6,whiteSpace:'pre-line'}}>
+              {c.tip}
+            </div>
+          )}
+        </div>
+      )}
+      <div style={{display:'flex',gap:8,marginTop:12}}>
+        <button onClick={()=>{setIdx(Math.max(0,idx-1));setFlip(false);setTip(false)}}
+          disabled={idx===0}
+          style={{flex:1,padding:'10px',border:`1px solid ${TL}`,borderRadius:8,
+            background:'white',color:TL,cursor:idx===0?'default':'pointer',
+            opacity:idx===0?0.4:1,fontWeight:600}}>← Previous</button>
+        <button onClick={()=>{setIdx(Math.min(cards.length-1,idx+1));setFlip(false);setTip(false)}}
+          disabled={idx===cards.length-1}
+          style={{flex:1,padding:'10px',border:'none',borderRadius:8,
+            background:TL,color:'white',cursor:idx===cards.length-1?'default':'pointer',
+            opacity:idx===cards.length-1?0.4:1,fontWeight:600}}>Next →</button>
+      </div>
+    </div>
+  );
+}
+
+/* ── Clinical scenario quiz ──────────────────────────── */
+function Quiz({scenarios:sc}) {
+  const [idx,setIdx]=useState(0);
+  const [sel,setSel]=useState(null);
+  const [score,setScore]=useState(0);
+  const [done,setDone]=useState(false);
+  const s=sc[idx];
+  const pick=i=>{if(sel!==null)return;setSel(i);if(i===s.correct)setScore(score+1)};
+  const next=()=>{if(idx<sc.length-1){setIdx(idx+1);setSel(null)}else setDone(true)};
+  if(done) return (
+    <div style={{textAlign:'center',padding:32,background:'#F0FDF4',borderRadius:12,border:`2px solid ${GN}`}}>
+      <div style={{fontSize:48,marginBottom:8}}>🎯</div>
+      <div style={{fontSize:24,fontWeight:700,color:NY}}>Score: {score}/{sc.length}</div>
+      <div style={{fontSize:16,color:'#334155',marginTop:8}}>
+        {score===sc.length?'Perfect!':score>=sc.length*0.7?'Good work! Review missed cases.':'Keep studying and try again.'}
+      </div>
+      <button onClick={()=>{setIdx(0);setSel(null);setScore(0);setDone(false)}}
+        style={{marginTop:16,padding:'10px 24px',background:TL,color:'white',
+          border:'none',borderRadius:8,cursor:'pointer',fontWeight:600}}>Try Again</button>
+    </div>
+  );
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:12}}>
+        <span style={{fontWeight:700,color:NY}}>{idx+1}/{sc.length}: {s.title}</span>
+        <span style={{color:TL,fontWeight:600}}>Score: {score}/{idx}</span>
+      </div>
+      <div style={{background:'#F8FAFC',borderRadius:8,padding:16,marginBottom:12,borderLeft:`4px solid ${NY}`}}>
+        <div style={{fontSize:15,color:'#1E293B',lineHeight:1.6}}>{s.desc}</div>
+      </div>
+      <div style={{display:'flex',flexDirection:'column',gap:8}}>
+        {s.options.map((o,i)=>{
+          let bg='white',bd='#E2E8F0',cl='#334155';
+          if(sel!==null){if(i===s.correct){bg='#DCFCE7';bd=GN;cl=GN}else if(sel===i){bg='#FEE2E2';bd=RD;cl=RD}}
+          return (
+            <button key={i} onClick={()=>pick(i)}
+              style={{padding:'12px 16px',background:bg,border:`2px solid ${bd}`,borderRadius:8,
+                cursor:sel!==null?'default':'pointer',textAlign:'left',fontSize:14,color:cl,
+                fontWeight:sel===i||(sel!==null&&i===s.correct)?700:400}}>
+              {String.fromCharCode(65+i)}) {o}
+            </button>
+          );
+        })}
+      </div>
+      {sel!==null && (
+        <div style={{marginTop:12,background:sel===s.correct?'#F0FDF4':'#FEF2F2',borderRadius:8,
+          padding:16,borderLeft:`4px solid ${sel===s.correct?GN:RD}`}}>
+          <div style={{fontWeight:700,color:sel===s.correct?GN:RD,marginBottom:6}}>
+            {sel===s.correct?'✓ Correct!':'✗ Incorrect'}
+          </div>
+          <div style={{fontSize:14,color:'#1E293B',lineHeight:1.6,whiteSpace:'pre-line'}}>{s.explanation}</div>
+        </div>
+      )}
+      {sel!==null && (
+        <button onClick={next}
+          style={{marginTop:12,width:'100%',padding:'12px',background:NY,color:'white',
+            border:'none',borderRadius:8,cursor:'pointer',fontWeight:600,fontSize:15}}>
+          {idx<sc.length-1?'Next Scenario →':'See Final Score'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ── Drug interaction challenge ──────────────────────── */
+function DrugCh({items}) {
+  const [idx,setIdx]=useState(0);
+  const [rev,setRev]=useState(false);
+  const it=items[idx];
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:12}}>
+        <span style={{fontWeight:700,color:NY}}>Challenge {idx+1}/{items.length}</span>
+      </div>
+      <div style={{background:'#F8FAFC',borderRadius:8,padding:16,marginBottom:12,borderLeft:`4px solid ${AM}`}}>
+        <div style={{fontSize:16,fontWeight:700,color:NY}}>{it.drug}</div>
+        <div style={{fontSize:14,color:'#64748B',marginTop:4}}>What is SAFE and what should you AVOID?</div>
+      </div>
+      {!rev ? (
+        <button onClick={()=>setRev(true)}
+          style={{width:'100%',padding:'12px',background:TL,color:'white',
+            border:'none',borderRadius:8,cursor:'pointer',fontWeight:600,fontSize:15}}>Reveal Answer</button>
+      ) : (
+        <div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+            <div style={{background:'#DCFCE7',borderRadius:8,padding:16,borderLeft:`4px solid ${GN}`}}>
+              <div style={{fontSize:12,fontWeight:700,color:GN,textTransform:'uppercase'}}>✓ Safe</div>
+              <div style={{fontSize:14,marginTop:4}}>{it.safe}</div>
+            </div>
+            <div style={{background:'#FEE2E2',borderRadius:8,padding:16,borderLeft:`4px solid ${RD}`}}>
+              <div style={{fontSize:12,fontWeight:700,color:RD,textTransform:'uppercase'}}>✗ Avoid</div>
+              <div style={{fontSize:14,marginTop:4}}>{it.avoid}</div>
+            </div>
+          </div>
+          <div style={{background:'#FEF3C7',borderRadius:8,padding:12,borderLeft:`4px solid ${AM}`,
+            fontSize:13,color:'#1E293B',lineHeight:1.6,whiteSpace:'pre-line'}}>
+            <strong>Why? </strong>{it.why}
+          </div>
+          <button onClick={()=>{setIdx(Math.min(items.length-1,idx+1));setRev(false)}}
+            disabled={idx===items.length-1}
+            style={{marginTop:12,width:'100%',padding:'12px',
+              background:idx===items.length-1?'#94A3B8':NY,color:'white',
+              border:'none',borderRadius:8,cursor:idx===items.length-1?'default':'pointer',
+              fontWeight:600,fontSize:15}}>
+            {idx===items.length-1?'All Complete ✓':'Next Challenge →'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Root App ────────────────────────────────────────── */
+function App() {
+  const [tab,setTab]=useState("welcome");
+  const cats=[...new Set(flash.map(f=>f.cat))];
+  const [cat,setCat]=useState(cats[0]);
+  const tabs=[
+    {id:"welcome",label:"Welcome",icon:"🏠"},
+    {id:"flash",label:"Flashcards",icon:"🃏"},
+    {id:"cases",label:"Clinical Cases",icon:"🏥"},
+    {id:"drugs",label:"Drug Interactions",icon:"💊"}
+  ];
+
+  return (
+    <div style={{fontFamily:"Calibri,-apple-system,sans-serif",maxWidth:840,margin:'0 auto',minHeight:'100vh'}}>
+
+      {/* ── Header ── */}
+      <div style={{background:`linear-gradient(135deg,${NY},${TL})`,padding:'20px 24px',color:'white'}}>
+        <div style={{fontSize:11,letterSpacing:2,textTransform:'uppercase',opacity:0.8}}>
+          Part 2 — Interactive Self-Learning Module
+        </div>
+        <div style={{fontSize:22,fontWeight:700,marginTop:4}}>
+          OTC Pain Management: Flashcards &amp; Clinical Challenges
+        </div>
+        <div style={{fontSize:13,opacity:0.8,marginTop:4,marginBottom:16}}>
+          Dr. Samar J Melhem | School of Pharmacy, University of Jordan
+        </div>
+
+        {/* ── DOCX Download Button ── */}
+        <button
+          id="docx-btn"
+          onClick={()=>window.generateDocx()}
+          style={{
+            display:'inline-flex',alignItems:'center',gap:8,
+            background:'#F59E0B',color:'#1E293B',border:'none',
+            borderRadius:8,padding:'10px 20px',cursor:'pointer',
+            fontWeight:700,fontSize:14,fontFamily:'inherit',
+            boxShadow:'0 2px 8px rgba(0,0,0,0.25)',
+            transition:'transform 0.1s, opacity 0.1s'
+          }}
+          onMouseOver={e=>e.currentTarget.style.opacity='0.9'}
+          onMouseOut={e=>e.currentTarget.style.opacity='1'}>
+          ⬇ Download Study Guide (.docx)
+        </button>
+        <div style={{fontSize:11,opacity:0.7,marginTop:6}}>
+          All 12 flashcards, 6 clinical cases &amp; 6 drug challenges — formatted for offline study
+        </div>
+      </div>
+
+      {/* ── Tab bar ── */}
+      <div style={{display:'flex',background:'white',borderBottom:'2px solid #E2E8F0',overflow:'auto'}}>
+        {tabs.map(t=>(
+          <button key={t.id} onClick={()=>setTab(t.id)}
+            style={{flex:1,padding:'12px 8px',border:'none',
+              background:tab===t.id?'#F0F9FF':'white',
+              borderBottom:tab===t.id?`3px solid ${TL}`:'3px solid transparent',
+              cursor:'pointer',fontSize:13,fontWeight:tab===t.id?700:400,
+              color:tab===t.id?TL:'#64748B',whiteSpace:'nowrap'}}>
+            <span style={{fontSize:18,display:'block'}}>{t.icon}</span>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Tab content ── */}
+      <div style={{padding:20,background:'#F8FAFC',minHeight:400}}>
+
+        {tab==="welcome" && (
+          <div style={{background:'white',borderRadius:12,padding:24,boxShadow:'0 2px 8px rgba(0,0,0,0.06)'}}>
+            <h2 style={{color:NY,margin:'0 0 12px'}}>Welcome to Part 2: Interactive Self-Learning</h2>
+            <p style={{color:'#334155',lineHeight:1.6,margin:'0 0 16px'}}>
+              This module reinforces your learning from the 60-minute lecture through interactive
+              flashcards, clinical scenario quizzes, and drug interaction challenges. Every answer
+              includes full explanations with all abbreviations and terms defined.
+            </p>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:16}}>
+              {[
+                {i:'🃏',t:'12 Flashcards',d:'Pain pathways, headache types, NSAID pharmacology, safety profiles'},
+                {i:'🏥',t:'6 Clinical Scenarios',d:'Headache differential, polypharmacy, pregnancy, MOH, red flags'},
+                {i:'💊',t:'6 Drug Interaction Challenges',d:'Warfarin, lithium, Triple Whammy, methotrexate, pregnancy, Reye\'s'},
+                {i:'📄',t:'Full Explanations',d:'Every abbreviation defined, pharmacological mechanisms explained'}
+              ].map((x,i)=>(
+                <div key={i} style={{background:'#F0F9FF',borderRadius:8,padding:16,borderLeft:`3px solid ${TL}`}}>
+                  <div style={{fontSize:24}}>{x.i}</div>
+                  <div style={{fontWeight:700,color:NY,fontSize:14,marginTop:4}}>{x.t}</div>
+                  <div style={{fontSize:12,color:'#64748B',marginTop:4}}>{x.d}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Download CTA box */}
+            <div style={{background:`linear-gradient(135deg,${NY}22,${TL}22)`,
+              border:`2px solid ${TL}`,borderRadius:10,padding:16,
+              display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
+              <div>
+                <div style={{fontWeight:700,color:NY,fontSize:15}}>📥 Download for Offline Study</div>
+                <div style={{fontSize:13,color:'#475569',marginTop:2}}>
+                  Get all content as a formatted Word document — study anywhere, anytime.
+                </div>
+              </div>
+              <button onClick={()=>window.generateDocx()}
+                style={{background:NY,color:'white',border:'none',borderRadius:8,
+                  padding:'10px 20px',cursor:'pointer',fontWeight:700,fontSize:14,
+                  fontFamily:'inherit',whiteSpace:'nowrap'}}>
+                ⬇ Download .docx
+              </button>
+            </div>
+
+            <div style={{marginTop:16,background:'#FEF3C7',borderRadius:8,padding:12,fontSize:13,color:'#92400E'}}>
+              <strong>Prerequisite: </strong>Complete the 60-minute lecture (Part 1) before starting these activities.
+            </div>
+          </div>
+        )}
+
+        {tab==="flash" && (
+          <div>
+            <div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>
+              {cats.map(c=>(
+                <button key={c} onClick={()=>setCat(c)}
+                  style={{padding:'6px 14px',borderRadius:20,
+                    border:`2px solid ${cat===c?TL:'#E2E8F0'}`,
+                    background:cat===c?TL:'white',
+                    color:cat===c?'white':'#334155',cursor:'pointer',fontSize:13,fontWeight:600}}>
+                  {c}
+                </button>
+              ))}
+            </div>
+            <FlashDeck cards={flash.filter(f=>f.cat===cat)} title={`${cat} Flashcards`} />
+          </div>
+        )}
+
+        {tab==="cases" && (
+          <div style={{background:'white',borderRadius:12,padding:20,boxShadow:'0 2px 8px rgba(0,0,0,0.06)'}}>
+            <h3 style={{color:NY,margin:'0 0 4px'}}>Clinical Scenario Challenges</h3>
+            <p style={{color:'#64748B',fontSize:13,margin:'0 0 16px'}}>
+              Apply analgesic selection, headache differential diagnosis, and safety screening.
+              Detailed explanations with all terms defined.
+            </p>
+            <Quiz scenarios={scenarios} />
+          </div>
+        )}
+
+        {tab==="drugs" && (
+          <div style={{background:'white',borderRadius:12,padding:20,boxShadow:'0 2px 8px rgba(0,0,0,0.06)'}}>
+            <h3 style={{color:NY,margin:'0 0 4px'}}>Drug Interaction Challenges</h3>
+            <p style={{color:'#64748B',fontSize:13,margin:'0 0 16px'}}>
+              For each patient, determine SAFE vs AVOID recommendations with pharmacological reasoning.
+            </p>
+            <DrugCh items={drugItems} />
+          </div>
+        )}
+      </div>
+
+      {/* ── Footer ── */}
+      <div style={{background:NY,color:'#94A3B8',padding:'16px 24px',textAlign:'center',fontSize:12}}>
+        Dr. Samar J Melhem | School of Pharmacy, University of Jordan | OTC Pain Management Module
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.render(React.createElement(App), document.getElementById('root'));
+</script>
+</body>
+</html>
