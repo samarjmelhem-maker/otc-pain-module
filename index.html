@@ -7,7 +7,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
-<script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html-docx-js/0.3.1/html-docx.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
@@ -131,209 +131,114 @@ var drugData=[
 ];
 
 // ── DOCX Generator ──────────────────────────────────────
-async function generateDocx() {
+function generateDocx() {
   var btn = document.getElementById('docx-btn');
-  btn.disabled = true;
-  btn.className = 'downloading';
-  btn.textContent = '⏳ Generating...';
+  if (btn) { btn.disabled = true; btn.className = 'downloading'; btn.textContent = '⏳ Generating...'; }
 
   try {
-    var D = window.docx;
-    var Paragraph = D.Paragraph, TextRun = D.TextRun, Document = D.Document,
-        Packer = D.Packer, HeadingLevel = D.HeadingLevel,
-        AlignmentType = D.AlignmentType;
+    // ── helpers ────────────────────────────────────────────
+    function esc(t) {
+      return (t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function nl2br(t) { return esc(t).replace(/\n/g,'<br>'); }
 
-    function hr() {
-      return new Paragraph({
-        children: [new TextRun({ text: "─".repeat(80), color: "CBD5E1", size: 16 })],
-        spacing: { before: 160, after: 160 }
-      });
-    }
-    function spacer(n) {
-      var arr = [];
-      for (var i = 0; i < (n||1); i++) arr.push(new Paragraph({ text: "" }));
-      return arr;
-    }
-    function h1(text) {
-      return new Paragraph({
-        children: [new TextRun({ text: text, bold: true, size: 40, color: "0D2D6B" })],
-        spacing: { before: 500, after: 200 },
-        border: { bottom: { color: "0A7E8C", size: 12, space: 1, style: "single" } }
-      });
-    }
-    function h2(text, color) {
-      return new Paragraph({
-        children: [new TextRun({ text: text, bold: true, size: 28, color: color || "0A7E8C" })],
-        spacing: { before: 280, after: 100 }
-      });
-    }
-    function label(txt, color) {
-      return new TextRun({ text: txt, bold: true, color: color, size: 22 });
-    }
-    function body(txt, opts) {
-      opts = opts || {};
-      return new TextRun({ text: txt, size: 22, color: opts.color || "1E293B",
-        italics: opts.italics, bold: opts.bold });
-    }
-    function multiline(text, indented, color) {
-      var lines = text.split('\n');
-      return lines.filter(function(l){ return l.trim(); }).map(function(l) {
-        return new Paragraph({
-          children: [new TextRun({ text: l, size: 22, color: color || "1E293B" })],
-          spacing: { after: 60 },
-          indent: indented ? { left: 360 } : undefined
-        });
-      });
-    }
+    var s = [];   // string buffer
 
-    var children = [];
+    // ── page styles ────────────────────────────────────────
+    s.push('<!DOCTYPE html><html><head><meta charset="UTF-8">');
+    s.push('<style>');
+    s.push('body{font-family:Calibri,sans-serif;font-size:11pt;color:#1E293B;margin:2cm 2.5cm;}');
+    s.push('h1{font-size:18pt;color:#0D2D6B;border-bottom:3px solid #0A7E8C;padding-bottom:6px;margin-top:28px;margin-bottom:10px;}');
+    s.push('h2{font-size:13pt;color:#0A7E8C;margin-top:18px;margin-bottom:6px;}');
+    s.push('h3{font-size:11pt;color:#0D2D6B;margin-top:14px;margin-bottom:4px;}');
+    s.push('.card{border:1px solid #CBD5E1;border-radius:6px;padding:14px 16px;margin-bottom:16px;page-break-inside:avoid;}');
+    s.push('.q{color:#0D2D6B;font-weight:bold;margin-bottom:8px;}');
+    s.push('.ans{background:#F0FDF4;border-left:4px solid #16A34A;padding:10px 14px;margin:8px 0;white-space:pre-wrap;}');
+    s.push('.tip{background:#FEF3C7;border-left:4px solid #F59E0B;padding:10px 14px;margin:8px 0;font-style:italic;white-space:pre-wrap;}');
+    s.push('.scenario{background:#F8FAFC;border-left:4px solid #0D2D6B;padding:12px 14px;margin-bottom:10px;}');
+    s.push('.opt{padding:5px 10px;margin:3px 0;border-radius:4px;}');
+    s.push('.correct{background:#DCFCE7;color:#166534;font-weight:bold;}');
+    s.push('.wrong{color:#475569;}');
+    s.push('.expl{background:#F0FDF4;border-left:4px solid #16A34A;padding:10px 14px;margin-top:8px;white-space:pre-wrap;}');
+    s.push('.safe{background:#DCFCE7;border-left:4px solid #16A34A;padding:10px 14px;margin:6px 0;}');
+    s.push('.avoid{background:#FEE2E2;border-left:4px solid #DC2626;padding:10px 14px;margin:6px 0;}');
+    s.push('.why{background:#FEF3C7;border-left:4px solid #F59E0B;padding:10px 14px;margin:6px 0;font-style:italic;}');
+    s.push('.lbl{font-weight:bold;}');
+    s.push('.title-block{text-align:center;margin-bottom:30px;padding-bottom:20px;border-bottom:3px double #0D2D6B;}');
+    s.push('.footer{text-align:center;font-size:9pt;color:#94A3B8;margin-top:30px;padding-top:10px;border-top:1px solid #E2E8F0;}');
+    s.push('hr{border:none;border-top:1px solid #E2E8F0;margin:16px 0;}');
+    s.push('</style></head><body>');
 
-    // ─── TITLE PAGE ───────────────────────────────────────
-    children.push(spacer(2)[0]);
-    children.push(new Paragraph({
-      children: [new TextRun({ text: "OTC Pain Management", bold: true, size: 64, color: "0D2D6B" })],
-      alignment: AlignmentType.CENTER
-    }));
-    children.push(new Paragraph({
-      children: [new TextRun({ text: "Interactive Self-Learning Study Guide", size: 36, color: "0A7E8C" })],
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 120 }
-    }));
-    children.push(new Paragraph({
-      children: [new TextRun({ text: "Part 2 — Flashcards, Clinical Cases & Drug Interaction Challenges", size: 24, color: "64748B" })],
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 240 }
-    }));
-    children.push(hr());
-    children.push(new Paragraph({
-      children: [new TextRun({ text: "Dr. Samar J Melhem", bold: true, size: 28, color: "0D2D6B" })],
-      alignment: AlignmentType.CENTER
-    }));
-    children.push(new Paragraph({
-      children: [new TextRun({ text: "School of Pharmacy | University of Jordan", size: 24, color: "64748B" })],
-      alignment: AlignmentType.CENTER
-    }));
-    children.push(spacer(1)[0]);
-    children.push(new Paragraph({
-      children: [new TextRun({ text: "Contents: 12 Flashcards  |  6 Clinical Scenarios  |  6 Drug Interaction Challenges", size: 22, color: "94A3B8", italics: true })],
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 400 }
-    }));
+    // ── TITLE PAGE ─────────────────────────────────────────
+    s.push('<div class="title-block">');
+    s.push('<p style="font-size:22pt;font-weight:bold;color:#0D2D6B;margin:0;">OTC Pain Management</p>');
+    s.push('<p style="font-size:15pt;color:#0A7E8C;margin:6px 0;">Interactive Self-Learning Study Guide</p>');
+    s.push('<p style="font-size:11pt;color:#64748B;margin:4px 0;">Part 2 — Flashcards, Clinical Cases &amp; Drug Interaction Challenges</p>');
+    s.push('<p style="font-size:12pt;font-weight:bold;color:#0D2D6B;margin:16px 0 2px;">Dr. Samar J Melhem</p>');
+    s.push('<p style="font-size:11pt;color:#64748B;margin:0;">School of Pharmacy | University of Jordan</p>');
+    s.push('<p style="font-size:10pt;color:#94A3B8;font-style:italic;margin-top:12px;">12 Flashcards &nbsp;|&nbsp; 6 Clinical Scenarios &nbsp;|&nbsp; 6 Drug Interaction Challenges</p>');
+    s.push('</div>');
 
-    // ─── SECTION 1: FLASHCARDS ────────────────────────────
-    children.push(h1("SECTION 1 — FLASHCARDS  (12 cards)"));
+    // ── SECTION 1: FLASHCARDS ──────────────────────────────
+    s.push('<h1>SECTION 1 &mdash; FLASHCARDS &nbsp;(12 cards)</h1>');
 
     flashData.forEach(function(card, i) {
-      children.push(h2("Card " + (i+1) + " of 12 \u2014 " + card.cat));
-      children.push(new Paragraph({
-        children: [label("Q:  ", "0D2D6B"), body(card.q)],
-        spacing: { after: 100 }
-      }));
-      children.push(new Paragraph({
-        children: [label("\u2713 Answer:", "16A34A")],
-        spacing: { after: 80 }
-      }));
-      multiline(card.a, true).forEach(function(p){ children.push(p); });
-      children.push(new Paragraph({
-        children: [label("\uD83D\uDCA1 Learning Tip:", "F59E0B")],
-        spacing: { before: 120, after: 80 }
-      }));
-      multiline(card.tip, true, "92400E").forEach(function(p){
-        p.children.forEach(function(r){ r.options.italics = true; });
-        children.push(p);
-      });
-      children.push(hr());
+      s.push('<div class="card">');
+      s.push('<h2>Card ' + (i+1) + ' of 12 &mdash; ' + esc(card.cat) + '</h2>');
+      s.push('<div class="q">Q: ' + esc(card.q) + '</div>');
+      s.push('<div class="ans"><span class="lbl" style="color:#16A34A;">&#10003; Answer:</span><br>' + nl2br(card.a) + '</div>');
+      s.push('<div class="tip"><span class="lbl" style="color:#92400E;">&#128161; Learning Tip &amp; Abbreviations:</span><br>' + nl2br(card.tip) + '</div>');
+      s.push('</div>');
     });
 
-    // ─── SECTION 2: CLINICAL SCENARIOS ────────────────────
-    children.push(h1("SECTION 2 — CLINICAL SCENARIOS  (6 cases)"));
-    children.push(new Paragraph({
-      children: [body("For each scenario, select the best pharmacist response. The correct answer and full explanation follow.", { italics: true, color: "64748B" })],
-      spacing: { after: 200 }
-    }));
+    // ── SECTION 2: CLINICAL SCENARIOS ─────────────────────
+    s.push('<h1>SECTION 2 &mdash; CLINICAL SCENARIOS &nbsp;(6 cases)</h1>');
+    s.push('<p style="color:#64748B;font-style:italic;">For each scenario, select the best pharmacist response. The correct answer and full explanation follow.</p>');
 
     scenariosData.forEach(function(sc, i) {
-      children.push(h2("Case " + (i+1) + " of 6:  " + sc.title, "0D2D6B"));
-      children.push(new Paragraph({
-        children: [body(sc.desc)],
-        spacing: { after: 120 }
-      }));
-      children.push(new Paragraph({
-        children: [label("Options:", "334155")],
-        spacing: { after: 80 }
-      }));
+      s.push('<div class="card">');
+      s.push('<h2>Case ' + (i+1) + ' of 6: ' + esc(sc.title) + '</h2>');
+      s.push('<div class="scenario">' + esc(sc.desc) + '</div>');
+      s.push('<div class="lbl" style="color:#334155;margin-bottom:4px;">Options:</div>');
       sc.options.forEach(function(opt, j) {
         var isCorrect = j === sc.correct;
-        children.push(new Paragraph({
-          children: [
-            new TextRun({ text: String.fromCharCode(65+j) + ") " + opt,
-              bold: isCorrect, color: isCorrect ? "16A34A" : "334155", size: 22 }),
-            isCorrect ? new TextRun({ text: "  \u2713 CORRECT", bold: true, color: "16A34A", size: 22 }) : new TextRun("")
-          ],
-          spacing: { after: 60 },
-          indent: { left: 360 }
-        }));
+        if (isCorrect) {
+          s.push('<div class="opt correct">' + String.fromCharCode(65+j) + ') ' + esc(opt) + ' &nbsp;&#10003; CORRECT</div>');
+        } else {
+          s.push('<div class="opt wrong">' + String.fromCharCode(65+j) + ') ' + esc(opt) + '</div>');
+        }
       });
-      children.push(new Paragraph({
-        children: [label("\uD83D\uDCDD Explanation:", "0D2D6B")],
-        spacing: { before: 140, after: 80 }
-      }));
-      multiline(sc.explanation, true).forEach(function(p){ children.push(p); });
-      children.push(hr());
+      s.push('<div class="expl"><span class="lbl" style="color:#0D2D6B;">&#128221; Explanation:</span><br>' + nl2br(sc.explanation) + '</div>');
+      s.push('</div>');
     });
 
-    // ─── SECTION 3: DRUG INTERACTIONS ─────────────────────
-    children.push(h1("SECTION 3 — DRUG INTERACTION CHALLENGES  (6 items)"));
-    children.push(new Paragraph({
-      children: [body("For each patient, identify the SAFE analgesic and what to AVOID, with pharmacological reasoning.", { italics: true, color: "64748B" })],
-      spacing: { after: 200 }
-    }));
+    // ── SECTION 3: DRUG INTERACTIONS ──────────────────────
+    s.push('<h1>SECTION 3 &mdash; DRUG INTERACTION CHALLENGES &nbsp;(6 items)</h1>');
+    s.push('<p style="color:#64748B;font-style:italic;">For each patient, identify the SAFE analgesic and what to AVOID, with pharmacological reasoning.</p>');
 
     drugData.forEach(function(item, i) {
-      children.push(h2("Challenge " + (i+1) + " of 6", "F59E0B"));
-      children.push(new Paragraph({
-        children: [label("\uD83D\uDC64 Patient:  ", "0D2D6B"), body(item.drug, { bold: true })],
-        spacing: { after: 100 }
-      }));
-      children.push(new Paragraph({
-        children: [label("\u2713 SAFE:  ", "16A34A"), body(item.safe)],
-        spacing: { after: 80 }
-      }));
-      children.push(new Paragraph({
-        children: [label("\u2717 AVOID:  ", "DC2626"), body(item.avoid)],
-        spacing: { after: 80 }
-      }));
-      children.push(new Paragraph({
-        children: [label("\uD83D\uDD0D Why?  ", "92400E"), body(item.why, { italics: true, color: "92400E" })],
-        spacing: { after: 80 }
-      }));
-      children.push(hr());
+      s.push('<div class="card">');
+      s.push('<h2>Challenge ' + (i+1) + ' of 6</h2>');
+      s.push('<h3>&#128100; Patient: ' + esc(item.drug) + '</h3>');
+      s.push('<div class="safe"><span class="lbl" style="color:#16A34A;">&#10003; SAFE: </span>' + esc(item.safe) + '</div>');
+      s.push('<div class="avoid"><span class="lbl" style="color:#DC2626;">&#10007; AVOID: </span>' + esc(item.avoid) + '</div>');
+      s.push('<div class="why"><span class="lbl" style="color:#92400E;">&#128269; Why? </span>' + esc(item.why) + '</div>');
+      s.push('</div>');
     });
 
-    // ─── FOOTER NOTE ──────────────────────────────────────
-    children.push(new Paragraph({
-      children: [new TextRun({ text: "Dr. Samar J Melhem  |  School of Pharmacy, University of Jordan  |  OTC Pain Management Module", size: 20, color: "94A3B8", italics: true })],
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 300 }
-    }));
+    // ── FOOTER ─────────────────────────────────────────────
+    s.push('<div class="footer">Dr. Samar J Melhem &nbsp;|&nbsp; School of Pharmacy, University of Jordan &nbsp;|&nbsp; OTC Pain Management Module</div>');
+    s.push('</body></html>');
 
-    var doc = new Document({
-      creator: "Dr. Samar J Melhem",
-      title: "OTC Pain Management Study Guide",
-      description: "Interactive Self-Learning Module — Part 2",
-      sections: [{ properties: {}, children: children }]
-    });
-
-    var blob = await Packer.toBlob(doc);
-    saveAs(blob, "OTC_Pain_Management_Study_Guide.docx");
+    var html = s.join('');
+    var blob = window.htmlDocx.asBlob(html);
+    saveAs(blob, 'OTC_Pain_Management_Study_Guide.docx');
 
   } catch(e) {
-    alert("Error generating DOCX: " + e.message);
+    alert('Error generating DOCX: ' + e.message);
     console.error(e);
   } finally {
-    btn.disabled = false;
-    btn.className = '';
-    btn.textContent = '⬇ Download Study Guide (.docx)';
+    if (btn) { btn.disabled = false; btn.className = ''; btn.textContent = '⬇ Download Study Guide (.docx)'; }
   }
 }
 </script>
